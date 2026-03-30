@@ -342,13 +342,14 @@ const App = () => {
       return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
     };
     
+    const phone = "0937773335";
     const note = `thanh toan tien com be Hai ngay ${formattedDate}`;
     const cleanNote = removeAccents(note);
     
-    const deepLink = `momo://pay?phone=0937493558&amount=${amount}&note=${encodeURIComponent(cleanNote)}`;
+    const vietQRUrl = `https://img.vietqr.io/image/MOMO-${phone}-compact.png?amount=${amount}&addInfo=${encodeURIComponent(cleanNote)}&accountName=BE%20HAI`;
     
-    window.location.href = deepLink;
-    showToast("Đang chuyển sang MoMo...");
+    window.open(vietQRUrl, '_blank');
+    showToast("Vui lòng quét mã QR để thanh toán");
   };
 
   const exportAsImage = async () => {
