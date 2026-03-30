@@ -587,7 +587,7 @@ const App = () => {
                               className="flex items-center justify-center gap-1 bg-[#A50064] hover:bg-[#8a0053] text-white px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-sm w-full"
                               title="Thanh toán qua MoMo"
                             >
-                              <Wallet size={12} /> MoMo
+                              <Wallet size={12} /> Pay
                             </button>
                           )}
                         </td>
