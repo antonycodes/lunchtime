@@ -6,24 +6,23 @@ import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc } from 'fi
 import { toPng } from 'html-to-image';
 
 const MENU_ITEMS = [
-  { name: 'Ba rọi chiên', price: 30000, tier: 1 },
-  { name: 'Ba rọi chiên thêm', price: 20000, tier: 0 },
-  { name: 'Cá kho', price: 20000, tier: 1 },
-  { name: 'Trứng chiên thịt', price: 20000, tier: 1 },
-  { name: 'Ếch kho', price: 20000, tier: 1 },
-  { name: 'Sườn nướng', price: 20000, tier: 1 },
-  { name: 'Thịt kho tiêu', price: 20000, tier: 1 },
-  { name: 'Canh chua không cá', price: 5000, tier: 1 },
-  { name: 'Đậu hũ nhồi thịt', price: 20000, tier: 1 },
-  { name: 'Thịt kho tôm', price: 20000, tier: 2 },
-  { name: 'Mắm chưng', price: 20000, tier: 2 },
-  { name: 'Gà đùi', price: 20000, tier: 2 },
-  { name: 'Lươn', price: 25000, tier: 2 },
-  { name: 'Thịt kho trứng', price: 20000, tier: 3 },
-  { name: 'Canh chua cá hú', price: 20000, tier: 3 },
-  { name: 'Hộp cơm trắng không', price: 10000, tier: 0 },
-  { name: 'Rau xào thêm', price: 5000, tier: 0 },
-  { name: 'Cơm thêm', price: 0, tier: 0 },
+  { name: 'Ba rọi chiên', price: 30000, extraPrice: 20000, tier: 1 },
+  { name: 'Cá kho', price: 30000, extraPrice: 20000, tier: 1 },
+  { name: 'Trứng chiên thịt', price: 40000, extraPrice: 20000, tier: 1 },
+  { name: 'Ếch kho', price: 30000, extraPrice: 20000, tier: 1 },
+  { name: 'Sườn nướng', price: 30000, extraPrice: 20000, tier: 1 },
+  { name: 'Thịt kho tiêu', price: 30000, extraPrice: 20000, tier: 1 },
+  { name: 'Canh chua không cá', price: 5000, extraPrice: 5000, tier: 1 },
+  { name: 'Đậu hũ nhồi thịt', price: 30000, extraPrice: 20000, tier: 1 },
+  { name: 'Thịt kho tôm', price: 30000, extraPrice: 20000, tier: 2 },
+  { name: 'Mắm chưng', price: 30000, extraPrice: 20000, tier: 2 },
+  { name: 'Gà đùi', price: 30000, extraPrice: 20000, tier: 2 },
+  { name: 'Lươn', price: 35000, extraPrice: 25000, tier: 2 },
+  { name: 'Thịt kho trứng', price: 30000, extraPrice: 20000, tier: 3 },
+  { name: 'Canh chua cá hú', price: 30000, extraPrice: 20000, tier: 3 },
+  { name: 'Hộp cơm trắng không', price: 10000, extraPrice: 10000, tier: 0 },
+  { name: 'Rau xào thêm', price: 5000, extraPrice: 5000, tier: 0 },
+  { name: 'Cơm thêm', price: 0, extraPrice: 0, tier: 0 },
 ];
 
 const INITIAL_NAMES = [
@@ -93,7 +92,18 @@ const App = () => {
 
     const q = query(collection(db, 'orders'), where('date', '==', date));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedOrders = snapshot.docs.map(doc => doc.data() as Order);
+      const fetchedOrders = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: data.id,
+          date: data.date,
+          name: data.name || '',
+          mainDish: data.mainDish || '',
+          extraDish: data.extraDish || '',
+          extraRice: data.extraRice || false,
+          paid: data.paid || false
+        } as Order;
+      });
       const fetchedMap = new Map(fetchedOrders.map(o => [o.id, o]));
       
       const mergedOrders: Order[] = [];
@@ -163,7 +173,17 @@ const App = () => {
     const orderToUpdate = orders.find(o => o.id === id);
     if (!orderToUpdate) return;
     
-    const updatedOrder = { ...orderToUpdate, [field]: value, date };
+    // Ensure all required fields are present and NO extra fields are included
+    const updatedOrder: Order = {
+      id: orderToUpdate.id,
+      date: date,
+      name: orderToUpdate.name || '',
+      mainDish: orderToUpdate.mainDish || '',
+      extraDish: orderToUpdate.extraDish || '',
+      extraRice: orderToUpdate.extraRice || false,
+      paid: orderToUpdate.paid || false,
+      [field]: value
+    };
     
     // Optimistic update
     setOrders(orders.map(o => o.id === id ? updatedOrder : o));
@@ -256,7 +276,7 @@ const App = () => {
     const main = MENU_ITEMS.find(m => m.name === order.mainDish);
     const extra = MENU_ITEMS.find(m => m.name === order.extraDish);
     if (main) total += main.price;
-    if (extra) total += extra.price;
+    if (extra) total += extra.extraPrice !== undefined ? extra.extraPrice : extra.price;
     return total;
   };
 
@@ -371,7 +391,9 @@ const App = () => {
                 <input 
                   type="date" 
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value) setDate(e.target.value);
+                  }}
                   className="bg-slate-100 border-none rounded-md px-2 py-0.5 text-blue-900 font-bold text-sm focus:ring-1 focus:ring-blue-500 cursor-pointer outline-none"
                 />
               </div>
@@ -483,6 +505,7 @@ const App = () => {
                           disabled={!canEdit}
                           className={`w-full bg-transparent border-none focus:ring-0 font-semibold text-sm ${!canEdit ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'}`}
                           value={order.name}
+                          maxLength={100}
                           placeholder="Nhập tên..."
                           onChange={(e) => updateOrder(order.id, 'name', e.target.value)}
                         />
@@ -508,7 +531,7 @@ const App = () => {
                           onChange={(e) => updateOrder(order.id, 'extraDish', e.target.value)}
                         >
                           <option value="">Không</option>
-                          {MENU_ITEMS.map(m => (
+                          {MENU_ITEMS.filter(m => m.name !== 'Cơm thêm').map(m => (
                             <option key={m.name} value={m.name}>{m.name}</option>
                           ))}
                         </select>
