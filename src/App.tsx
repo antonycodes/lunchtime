@@ -1,14 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut } from 'lucide-react';
+import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle } from 'lucide-react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, setDoc, doc } from 'firebase/firestore';
-
-declare global {
-  interface Window {
-    html2canvas: any;
-  }
-}
+import html2canvas from 'html2canvas';
 
 const MENU_ITEMS = [
   { name: 'Ba rọi chiên', price: 30000, tier: 1 },
@@ -47,14 +42,23 @@ interface Order {
   paid: boolean;
 }
 
+const getLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   const [orders, setOrders] = useState<Order[]>(
     INITIAL_NAMES.map((name, index) => ({
       id: index + 1,
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(),
       name: name,
       mainDish: '',
       extraDish: '',
@@ -63,7 +67,7 @@ const App = () => {
     }))
   );
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -79,11 +83,8 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => { document.body.removeChild(script); };
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -139,6 +140,10 @@ const App = () => {
       console.error("Login error:", error);
       if (error.code === 'auth/popup-closed-by-user') {
         // User closed the popup, ignore silently or show a specific message
+        return;
+      }
+      if (error.code === 'auth/unauthorized-domain') {
+        showToast("Lỗi: Domain chưa được cấp quyền trên Firebase!");
         return;
       }
       showToast("Lỗi đăng nhập!");
@@ -237,21 +242,37 @@ const App = () => {
     document.body.removeChild(textArea);
   };
 
+  const checkIsPastDeadline = () => {
+    const selectedDateObj = new Date(date);
+    selectedDateObj.setHours(0,0,0,0);
+    
+    const todayObj = new Date();
+    todayObj.setHours(0,0,0,0);
+
+    if (selectedDateObj < todayObj) return true;
+    if (selectedDateObj > todayObj) return false;
+    
+    const hours = currentTime.getHours();
+    const minutes = currentTime.getMinutes();
+    return hours > 10 || (hours === 10 && minutes >= 30);
+  };
+
+  const isPastDeadline = checkIsPastDeadline();
+
   const exportAsImage = async () => {
-    if (!window.html2canvas) {
-      showToast("Đang tải thư viện...");
-      return;
-    }
     if (activeOrders.length === 0) {
       showToast("Chưa có món để xuất ảnh!");
       return;
     }
     
     try {
-      const canvas = await window.html2canvas(exportRef.current, {
+      showToast("Đang tạo ảnh...");
+      const canvas = await html2canvas(exportRef.current!, {
         backgroundColor: '#ffffff',
-        scale: 3,
+        scale: 2,
         logging: false,
+        useCORS: true,
+        allowTaint: true
       });
       
       const image = canvas.toDataURL("image/png");
@@ -261,6 +282,7 @@ const App = () => {
       link.click();
       showToast("Đã xuất ảnh!");
     } catch (err) {
+      console.error("Export error:", err);
       showToast("Lỗi xuất ảnh!");
     }
   };
@@ -314,7 +336,24 @@ const App = () => {
                   className="bg-slate-100 border-none rounded-md px-2 py-0.5 text-blue-900 font-bold text-sm focus:ring-1 focus:ring-blue-500 cursor-pointer outline-none"
                 />
               </div>
-              <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">{formattedDate}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">{formattedDate}</p>
+                <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                  <Clock size={12} />
+                  <span>{currentTime.toLocaleTimeString('vi-VN')}</span>
+                </div>
+                <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                {isPastDeadline ? (
+                  <span className="text-[11px] font-bold text-rose-500 flex items-center gap-1">
+                    <AlertCircle size={12} /> Đã chốt (10h30)
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-emerald-500 flex items-center gap-1">
+                    <Clock size={12} /> Hạn: 10h30
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           
@@ -335,7 +374,8 @@ const App = () => {
             </button>
             <button 
               onClick={addNewRow}
-              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg transition-all shadow-md shadow-slate-200 active:scale-95 font-bold text-xs"
+              disabled={isPastDeadline}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all shadow-md active:scale-95 font-bold text-xs ${isPastDeadline ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-slate-800 hover:bg-slate-900 text-white shadow-slate-200'}`}
             >
               <Plus size={14} />
               <span>Thêm</span>
@@ -373,7 +413,8 @@ const App = () => {
                       <td className="px-4 py-2">
                         <input 
                           type="text"
-                          className="w-full bg-transparent border-none focus:ring-0 font-semibold text-slate-700 text-sm"
+                          disabled={isPastDeadline}
+                          className={`w-full bg-transparent border-none focus:ring-0 font-semibold text-sm ${isPastDeadline ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'}`}
                           value={order.name}
                           placeholder="Nhập tên..."
                           onChange={(e) => updateOrder(order.id, 'name', e.target.value)}
@@ -381,7 +422,8 @@ const App = () => {
                       </td>
                       <td className="px-4 py-2">
                         <select 
-                          className={`w-full bg-transparent border-none focus:ring-0 text-sm cursor-pointer ${order.mainDish ? 'text-blue-600 font-bold' : 'text-slate-400'}`}
+                          disabled={isPastDeadline}
+                          className={`w-full bg-transparent border-none focus:ring-0 text-sm ${isPastDeadline ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${order.mainDish ? 'text-blue-600 font-bold' : 'text-slate-400'}`}
                           value={order.mainDish}
                           onChange={(e) => updateOrder(order.id, 'mainDish', e.target.value)}
                         >
@@ -393,7 +435,8 @@ const App = () => {
                       </td>
                       <td className="px-4 py-2">
                         <select 
-                          className="w-full bg-transparent border-none focus:ring-0 text-xs text-slate-500 cursor-pointer"
+                          disabled={isPastDeadline}
+                          className={`w-full bg-transparent border-none focus:ring-0 text-xs text-slate-500 ${isPastDeadline ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
                           value={order.extraDish}
                           onChange={(e) => updateOrder(order.id, 'extraDish', e.target.value)}
                         >
@@ -406,7 +449,8 @@ const App = () => {
                       <td className="px-4 py-2 text-center">
                         <input 
                           type="checkbox" 
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          disabled={isPastDeadline}
+                          className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 ${isPastDeadline ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
                           checked={order.extraRice}
                           onChange={(e) => updateOrder(order.id, 'extraRice', e.target.checked)}
                         />
