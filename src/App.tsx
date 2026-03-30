@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle } from 'lucide-react';
+import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2 } from 'lucide-react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { collection, query, where, onSnapshot, setDoc, doc } from 'firebase/firestore';
-import html2canvas from 'html2canvas';
+import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { toPng } from 'html-to-image';
 
 const MENU_ITEMS = [
   { name: 'Ba rọi chiên', price: 30000, tier: 1 },
@@ -88,7 +88,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (!user || !isAuthReady) return;
+    if (!isAuthReady) return;
 
     const q = query(collection(db, 'orders'), where('date', '==', date));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -125,7 +125,7 @@ const App = () => {
     });
     
     return () => unsubscribe();
-  }, [date, user, isAuthReady]);
+  }, [date, isAuthReady]);
 
   const showToast = (msg: string) => {
     setMessage(msg);
@@ -172,6 +172,30 @@ const App = () => {
     } catch (error) {
       console.error("Error updating order:", error);
       showToast("Lỗi lưu dữ liệu!");
+    }
+  };
+
+  const deleteOrder = async (id: number) => {
+    if (!user) return;
+    
+    // Optimistic update
+    if (id <= INITIAL_NAMES.length) {
+      const emptyOrder = { id, date, name: '', mainDish: '', extraDish: '', extraRice: false, paid: false };
+      setOrders(orders.map(o => o.id === id ? emptyOrder : o));
+      try {
+        await setDoc(doc(db, 'orders', `${date}_${id}`), emptyOrder);
+      } catch (error) {
+        console.error("Error clearing order:", error);
+        showToast("Lỗi xoá dữ liệu!");
+      }
+    } else {
+      setOrders(orders.filter(o => o.id !== id));
+      try {
+        await deleteDoc(doc(db, 'orders', `${date}_${id}`));
+      } catch (error) {
+        console.error("Error deleting order:", error);
+        showToast("Lỗi xoá dữ liệu!");
+      }
     }
   };
 
@@ -258,6 +282,7 @@ const App = () => {
   };
 
   const isPastDeadline = checkIsPastDeadline();
+  const canEdit = !!user;
 
   const exportAsImage = async () => {
     if (activeOrders.length === 0) {
@@ -267,18 +292,17 @@ const App = () => {
     
     try {
       showToast("Đang tạo ảnh...");
-      const canvas = await html2canvas(exportRef.current!, {
+      if (!exportRef.current) return;
+      
+      const dataUrl = await toPng(exportRef.current, {
         backgroundColor: '#ffffff',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true
+        pixelRatio: 2,
+        cacheBust: true,
       });
       
-      const image = canvas.toDataURL("image/png");
       const link = document.createElement('a');
-      link.href = image;
       link.download = `Chi_Tiet_Order_${formattedDate.replace(/\//g, '-')}.png`;
+      link.href = dataUrl;
       link.click();
       showToast("Đã xuất ảnh!");
     } catch (err) {
@@ -295,31 +319,17 @@ const App = () => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-          <div className="bg-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-600">
-            <Calendar size={32} />
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tight">Cơm Trưa</h1>
-          <p className="text-slate-500 mb-8">Vui lòng đăng nhập để xem và đặt món</p>
-          <button
-            onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md shadow-blue-200 active:scale-95"
-          >
-            <LogIn size={20} />
-            Đăng nhập với Google
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans text-slate-800">
       <div className="max-w-7xl mx-auto">
         
+        {!user && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium shadow-sm">
+            <AlertCircle size={16} />
+            <span>Chế độ xem ẩn danh. Vui lòng đăng nhập để đặt món.</span>
+          </div>
+        )}
+
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-3">
@@ -346,7 +356,7 @@ const App = () => {
                 <div className="w-1 h-1 rounded-full bg-slate-300"></div>
                 {isPastDeadline ? (
                   <span className="text-[11px] font-bold text-rose-500 flex items-center gap-1">
-                    <AlertCircle size={12} /> Đã chốt (10h30)
+                    <AlertCircle size={12} /> Đã quá giờ chốt cơm, hẹn gặp lại ngày mai!
                   </span>
                 ) : (
                   <span className="text-[11px] font-bold text-emerald-500 flex items-center gap-1">
@@ -374,20 +384,39 @@ const App = () => {
             </button>
             <button 
               onClick={addNewRow}
-              disabled={isPastDeadline}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all shadow-md active:scale-95 font-bold text-xs ${isPastDeadline ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-slate-800 hover:bg-slate-900 text-white shadow-slate-200'}`}
+              disabled={!canEdit}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all shadow-md active:scale-95 font-bold text-xs ${!canEdit ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-slate-800 hover:bg-slate-900 text-white shadow-slate-200'}`}
             >
               <Plus size={14} />
               <span>Thêm</span>
             </button>
             <div className="h-8 w-px bg-slate-200 mx-1"></div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-rose-500 px-2 py-2 rounded-lg transition-all font-bold text-xs"
-              title="Đăng xuất"
-            >
-              <LogOut size={16} />
-            </button>
+            {user ? (
+              <div className="flex items-center gap-2">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="Avatar" className="w-7 h-7 rounded-full border border-slate-200 object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                    {user.displayName?.charAt(0) || 'U'}
+                  </div>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1 text-slate-500 hover:text-rose-500 p-1.5 rounded-lg transition-all font-bold text-xs"
+                  title="Đăng xuất"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleLogin}
+                className="flex items-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-2 rounded-lg transition-all font-bold text-xs"
+              >
+                <LogIn size={14} />
+                <span>Đăng nhập</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -403,7 +432,7 @@ const App = () => {
                     <th className="px-4 py-3">Món Chính</th>
                     <th className="px-4 py-3">Thêm</th>
                     <th className="px-4 py-3 text-center w-16">Cơm</th>
-                    <th className="px-4 py-3 text-center w-16">T.T</th>
+                    <th className="px-4 py-3 text-center w-16">Xoá</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -413,8 +442,8 @@ const App = () => {
                       <td className="px-4 py-2">
                         <input 
                           type="text"
-                          disabled={isPastDeadline}
-                          className={`w-full bg-transparent border-none focus:ring-0 font-semibold text-sm ${isPastDeadline ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'}`}
+                          disabled={!canEdit}
+                          className={`w-full bg-transparent border-none focus:ring-0 font-semibold text-sm ${!canEdit ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'}`}
                           value={order.name}
                           placeholder="Nhập tên..."
                           onChange={(e) => updateOrder(order.id, 'name', e.target.value)}
@@ -422,8 +451,8 @@ const App = () => {
                       </td>
                       <td className="px-4 py-2">
                         <select 
-                          disabled={isPastDeadline}
-                          className={`w-full bg-transparent border-none focus:ring-0 text-sm ${isPastDeadline ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${order.mainDish ? 'text-blue-600 font-bold' : 'text-slate-400'}`}
+                          disabled={!canEdit}
+                          className={`w-full bg-transparent border-none focus:ring-0 text-sm ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${order.mainDish ? 'text-blue-600 font-bold' : 'text-slate-400'}`}
                           value={order.mainDish}
                           onChange={(e) => updateOrder(order.id, 'mainDish', e.target.value)}
                         >
@@ -435,8 +464,8 @@ const App = () => {
                       </td>
                       <td className="px-4 py-2">
                         <select 
-                          disabled={isPastDeadline}
-                          className={`w-full bg-transparent border-none focus:ring-0 text-xs text-slate-500 ${isPastDeadline ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                          disabled={!canEdit}
+                          className={`w-full bg-transparent border-none focus:ring-0 text-xs text-slate-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
                           value={order.extraDish}
                           onChange={(e) => updateOrder(order.id, 'extraDish', e.target.value)}
                         >
@@ -449,18 +478,20 @@ const App = () => {
                       <td className="px-4 py-2 text-center">
                         <input 
                           type="checkbox" 
-                          disabled={isPastDeadline}
-                          className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 ${isPastDeadline ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                          disabled={!canEdit}
+                          className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
                           checked={order.extraRice}
                           onChange={(e) => updateOrder(order.id, 'extraRice', e.target.checked)}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
                         <button 
-                          onClick={() => updateOrder(order.id, 'paid', !order.paid)}
-                          className={`p-1.5 rounded-lg transition-all ${order.paid ? 'text-emerald-600 bg-emerald-50' : 'text-slate-200 hover:text-rose-400'}`}
+                          disabled={!canEdit}
+                          onClick={() => deleteOrder(order.id)}
+                          className={`p-1.5 rounded-lg transition-all ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} text-slate-400 hover:text-rose-500 hover:bg-rose-50`}
+                          title="Xoá"
                         >
-                          <CheckCircle size={20} fill={order.paid ? "currentColor" : "none"} />
+                          <Trash2 size={18} />
                         </button>
                       </td>
                     </tr>
