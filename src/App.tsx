@@ -8,7 +8,7 @@ import { toPng } from 'html-to-image';
 const MENU_ITEMS = [
   { name: 'Ba rọi chiên', price: 30000, extraPrice: 20000, tier: 1 },
   { name: 'Cá kho', price: 30000, extraPrice: 20000, tier: 1 },
-  { name: 'Trứng chiên thịt', price: 40000, extraPrice: 20000, tier: 1 },
+  { name: 'Trứng chiên thịt', price: 30000, extraPrice: 20000, tier: 1 },
   { name: 'Ếch kho', price: 30000, extraPrice: 20000, tier: 1 },
   { name: 'Sườn nướng', price: 30000, extraPrice: 20000, tier: 1 },
   { name: 'Thịt kho tiêu', price: 30000, extraPrice: 20000, tier: 1 },
