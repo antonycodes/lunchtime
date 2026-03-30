@@ -211,22 +211,18 @@ const App = () => {
     
     // Optimistic update
     if (id <= INITIAL_NAMES.length) {
-      const emptyOrder = { id, date, name: '', mainDish: '', extraDish: '', extraRice: false, paid: false, note: '' };
+      const originalName = INITIAL_NAMES[id - 1];
+      const emptyOrder = { id, date, name: originalName, mainDish: '', extraDish: '', extraRice: false, paid: false, note: '' };
       setOrders(orders.map(o => o.id === id ? emptyOrder : o));
-      try {
-        await setDoc(doc(db, 'orders', `${date}_${id}`), emptyOrder);
-      } catch (error) {
-        console.error("Error clearing order:", error);
-        showToast("Lỗi xoá dữ liệu!");
-      }
     } else {
       setOrders(orders.filter(o => o.id !== id));
-      try {
-        await deleteDoc(doc(db, 'orders', `${date}_${id}`));
-      } catch (error) {
-        console.error("Error deleting order:", error);
-        showToast("Lỗi xoá dữ liệu!");
-      }
+    }
+
+    try {
+      await deleteDoc(doc(db, 'orders', `${date}_${id}`));
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      showToast("Lỗi xoá dữ liệu!");
     }
   };
 
@@ -239,17 +235,7 @@ const App = () => {
     
     try {
       showToast("Đang reset...");
-      const promises = INITIAL_NAMES.map((name, index) => {
-        const id = index + 1;
-        const emptyOrder = { id, date, name, mainDish: '', extraDish: '', extraRice: false, paid: false, note: '' };
-        return setDoc(doc(db, 'orders', `${date}_${id}`), emptyOrder);
-      });
-      
-      const extraOrders = orders.filter(o => o.id > INITIAL_NAMES.length);
-      extraOrders.forEach(o => {
-        promises.push(deleteDoc(doc(db, 'orders', `${date}_${o.id}`)));
-      });
-
+      const promises = orders.map(o => deleteDoc(doc(db, 'orders', `${date}_${o.id}`)));
       await Promise.all(promises);
       showToast("Đã reset danh sách!");
     } catch (error) {
@@ -392,101 +378,102 @@ const App = () => {
         )}
 
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
-              <Calendar size={20} />
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <div className="bg-blue-50 p-1.5 rounded-lg text-blue-600 shrink-0">
+              <Calendar size={18} />
             </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-black text-blue-900 uppercase tracking-tight">Cơm Trưa</h1>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base font-black text-blue-900 uppercase tracking-tight whitespace-nowrap">Cơm Trưa</h1>
                 <input 
                   type="date" 
                   value={date}
                   onChange={(e) => {
                     if (e.target.value) setDate(e.target.value);
                   }}
-                  className="bg-slate-100 border-none rounded-md px-2 py-0.5 text-blue-900 font-bold text-sm focus:ring-1 focus:ring-blue-500 cursor-pointer outline-none"
+                  className="bg-slate-100 border-none rounded-md px-2 py-0.5 text-blue-900 font-bold text-xs focus:ring-1 focus:ring-blue-500 cursor-pointer outline-none"
                 />
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">{formattedDate}</p>
-                <div className="w-1 h-1 rounded-full bg-slate-300"></div>
-                <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
-                  <Clock size={12} />
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                  <Clock size={10} />
                   <span>{currentTime.toLocaleTimeString('vi-VN')}</span>
                 </div>
                 <div className="w-1 h-1 rounded-full bg-slate-300"></div>
                 {isPastDeadline ? (
-                  <span className="text-[11px] font-bold text-rose-500 flex items-center gap-1">
-                    <AlertCircle size={12} /> Đã quá giờ chốt cơm, hẹn gặp lại ngày mai!
+                  <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 truncate">
+                    <AlertCircle size={10} /> Quá giờ (10h30)
                   </span>
                 ) : (
-                  <span className="text-[11px] font-bold text-emerald-500 flex items-center gap-1">
-                    <Clock size={12} /> Hạn: 10h30
+                  <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
+                    <Clock size={10} /> Hạn: 10h30
                   </span>
                 )}
               </div>
             </div>
           </div>
           
-          <div className="flex flex-wrap justify-center items-center gap-1.5">
+          <div className="flex flex-wrap justify-start sm:justify-end items-center gap-1.5 w-full sm:w-auto mt-1 sm:mt-0">
             <button 
               onClick={resetInitialNames}
               disabled={!canEdit}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all active:scale-95 font-bold text-xs border ${!canEdit ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 shadow-sm'}`}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all active:scale-95 font-bold text-xs border ${!canEdit ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 shadow-sm'}`}
               title="Reset danh sách về mặc định"
             >
               <RotateCcw size={14} />
-              <span className="hidden sm:inline">Reset</span>
+              <span className="hidden md:inline">Reset</span>
             </button>
             <button 
               onClick={copyToClipboard}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all active:scale-95 font-bold text-xs border ${copied ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-sm'}`}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all active:scale-95 font-bold text-xs border ${copied ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-sm'}`}
+              title="Copy danh sách"
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copied ? 'Đã Copy' : 'Copy'}</span>
+              <span className="hidden sm:inline">{copied ? 'Đã Copy' : 'Copy'}</span>
             </button>
             <button 
               onClick={exportAsImage}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all shadow-md shadow-blue-200 active:scale-95 font-bold text-xs"
+              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg transition-all shadow-sm shadow-blue-200 active:scale-95 font-bold text-xs"
+              title="Xuất Ảnh"
             >
               <Camera size={14} />
-              <span>Xuất Ảnh</span>
+              <span className="hidden sm:inline">Xuất Ảnh</span>
             </button>
             <button 
               onClick={addNewRow}
               disabled={!canEdit}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all shadow-md active:scale-95 font-bold text-xs ${!canEdit ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-slate-800 hover:bg-slate-900 text-white shadow-slate-200'}`}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all shadow-sm active:scale-95 font-bold text-xs ${!canEdit ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-slate-800 hover:bg-slate-900 text-white shadow-slate-200'}`}
+              title="Thêm dòng"
             >
               <Plus size={14} />
-              <span>Thêm</span>
+              <span className="hidden sm:inline">Thêm</span>
             </button>
-            <div className="h-8 w-px bg-slate-200 mx-1"></div>
+            <div className="h-6 w-px bg-slate-200 mx-0.5"></div>
             {user ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {user.photoURL ? (
-                  <img src={user.photoURL} alt="Avatar" className="w-7 h-7 rounded-full border border-slate-200 object-cover" referrerPolicy="no-referrer" />
+                  <img src={user.photoURL} alt="Avatar" className="w-6 h-6 rounded-full border border-slate-200 object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[10px]">
                     {user.displayName?.charAt(0) || 'U'}
                   </div>
                 )}
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-1 text-slate-500 hover:text-rose-500 p-1.5 rounded-lg transition-all font-bold text-xs"
+                  className="flex items-center gap-1 text-slate-500 hover:text-rose-500 p-1 rounded-lg transition-all font-bold text-xs"
                   title="Đăng xuất"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={14} />
                 </button>
               </div>
             ) : (
               <button
                 onClick={handleLogin}
-                className="flex items-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-2 rounded-lg transition-all font-bold text-xs"
+                className="flex items-center gap-1 bg-blue-50 text-blue-600 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-all font-bold text-xs"
               >
                 <LogIn size={14} />
-                <span>Đăng nhập</span>
+                <span className="hidden sm:inline">Đăng nhập</span>
               </button>
             )}
           </div>
