@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2, RotateCcw, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
+import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2, RotateCcw, ChevronDown, ChevronUp, Wallet, X } from 'lucide-react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -73,6 +73,7 @@ const App = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [expandedMobileOrders, setExpandedMobileOrders] = useState<Record<number, boolean>>({});
+  const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
 
   const toggleMobileExpand = (id: number) => {
     setExpandedMobileOrders(prev => ({ ...prev, [id]: !prev[id] }));
@@ -331,25 +332,32 @@ const App = () => {
   const isPastDeadline = checkIsPastDeadline();
   const canEdit = !!user;
 
+  const getPaymentDetails = (order: Order) => {
+    const amount = calculatePrice(order);
+    const removeAccents = (str: string) => {
+      return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+    };
+    
+    const note = `${order.name || 'KHACH'} paid order ${formattedDate}`;
+    const cleanNote = removeAccents(note).toUpperCase();
+    
+    const bankCode = "TCB";
+    const accountNumber = "19025518567016";
+    const accountName = "TRAN THI BICH LIEN"; // Thay bằng tên thật của bạn (không dấu)
+    
+    // Link VietQR chuẩn NAPAS 247
+    const qrUrl = `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact.png?amount=${amount}&addInfo=${encodeURIComponent(cleanNote)}&accountName=${encodeURIComponent(accountName)}`;
+    
+    return { amount, cleanNote, bankCode, accountNumber, accountName, qrUrl };
+  };
+
   const handlePayment = (order: Order) => {
     const amount = calculatePrice(order);
     if (amount === 0) {
       showToast("Đơn hàng chưa có số tiền hợp lệ!");
       return;
     }
-    
-    const removeAccents = (str: string) => {
-      return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
-    };
-    
-    const phone = "0937773335";
-    const note = `thanh toan tien com be Hai ngay ${formattedDate}`;
-    const cleanNote = removeAccents(note);
-    
-    const vietQRUrl = `https://img.vietqr.io/image/MOMO-${phone}-compact.png?amount=${amount}&addInfo=${encodeURIComponent(cleanNote)}&accountName=BE%20HAI`;
-    
-    window.open(vietQRUrl, '_blank');
-    showToast("Vui lòng quét mã QR để thanh toán");
+    setPaymentOrder(order);
   };
 
   const exportAsImage = async () => {
@@ -584,10 +592,10 @@ const App = () => {
                           {calculatePrice(order) > 0 && (
                             <button 
                               onClick={() => handlePayment(order)}
-                              className="flex items-center justify-center gap-1 bg-[#A50064] hover:bg-[#8a0053] text-white px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-sm w-full"
-                              title="Thanh toán qua MoMo"
+                              className="flex items-center justify-center gap-1 bg-rose-600 hover:bg-rose-700 text-white px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-sm w-full"
+                              title="Thanh toán qua VietQR"
                             >
-                              <Wallet size={12} /> Pay
+                              <Wallet size={12} /> VietQR
                             </button>
                           )}
                         </td>
@@ -642,8 +650,8 @@ const App = () => {
                             <span className="text-xs font-bold text-blue-600">{calculatePrice(order).toLocaleString()}đ</span>
                             <button
                               onClick={(e) => { e.stopPropagation(); handlePayment(order); }}
-                              className="bg-[#A50064] hover:bg-[#8a0053] text-white p-1.5 rounded-lg transition-all shadow-sm flex items-center justify-center"
-                              title="Thanh toán MoMo"
+                              className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded-lg transition-all shadow-sm flex items-center justify-center"
+                              title="Thanh toán VietQR"
                             >
                               <Wallet size={14} />
                             </button>
@@ -819,6 +827,78 @@ const App = () => {
           <span className="font-bold text-xs tracking-wide">{message}</span>
         </div>
       )}
+
+      {/* Payment Modal */}
+      {paymentOrder && (() => {
+        const details = getPaymentDetails(paymentOrder);
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
+                <h3 className="font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                  <Wallet size={18} className="text-rose-600" />
+                  Thanh toán VietQR
+                </h3>
+                <button onClick={() => setPaymentOrder(null)} className="text-slate-400 hover:text-rose-500 transition-colors p-1 rounded-lg hover:bg-rose-50">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="p-6 flex flex-col md:flex-row gap-8 items-center md:items-start">
+                {/* QR Code */}
+                <div className="shrink-0 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center gap-3">
+                  <img src={details.qrUrl} alt="VietQR" className="w-64 h-64 object-contain rounded-xl" />
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
+                    Quét mã bằng App Ngân Hàng
+                  </div>
+                </div>
+                
+                {/* Payment Details */}
+                <div className="flex-1 w-full space-y-4">
+                  <div className="bg-blue-50 text-blue-800 p-3 rounded-xl text-xs font-semibold border border-blue-100 flex items-start gap-2">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-blue-600" />
+                    <span>Vui lòng kiểm tra kỹ thông tin người nhận và số tiền trước khi chuyển khoản.</span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex flex-col border-b border-slate-100 pb-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngân hàng</span>
+                      <span className="font-bold text-slate-800 text-sm">Techcombank (TCB)</span>
+                    </div>
+                    <div className="flex flex-col border-b border-slate-100 pb-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Số tài khoản</span>
+                      <span className="font-mono font-black text-lg text-slate-800 tracking-tight">{details.accountNumber}</span>
+                    </div>
+                    <div className="flex flex-col border-b border-slate-100 pb-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Người nhận</span>
+                      <span className="font-bold text-slate-800 text-sm">{details.accountName}</span>
+                    </div>
+                    <div className="flex flex-col border-b border-slate-100 pb-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Số tiền</span>
+                      <span className="font-black text-2xl text-rose-600 tracking-tighter">{details.amount.toLocaleString()}đ</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nội dung chuyển khoản</span>
+                      <div className="font-mono text-sm font-bold text-slate-700 bg-slate-100 p-3 rounded-xl mt-1.5 break-all border border-slate-200">
+                        {details.cleanNote}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button 
+                  onClick={() => setPaymentOrder(null)}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm rounded-xl transition-all shadow-sm active:scale-95"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700&display=swap');
