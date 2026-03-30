@@ -24,7 +24,6 @@ const MENU_ITEMS = [
   { name: 'Rau xào thêm', price: 5000, extraPrice: 5000, tier: 0 },
   { name: 'Cơm thêm', price: 0, extraPrice: 0, tier: 0 },
 ];
-
 const INITIAL_NAMES = [
   "Bùi Sơn Trà", "Vưu Tấn Lộc", "Nguyễn Hữu Lộc", "Nguyễn Ngọc Tiến",
   "Trần Lưu Thanh Nhân", "Nguyễn Văn Hoàng", "Nguyễn Minh Thành",
@@ -72,6 +71,7 @@ const App = () => {
   const [date, setDate] = useState(getLocalDateString());
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedAccount, setCopiedAccount] = useState(false);
   const [expandedMobileOrders, setExpandedMobileOrders] = useState<Record<number, boolean>>({});
   const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
 
@@ -308,6 +308,22 @@ const App = () => {
       setCopied(true);
       showToast("Đã copy danh sách!");
       setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      showToast("Lỗi copy!");
+    }
+    document.body.removeChild(textArea);
+  };
+
+  const copyAccountNumber = (accNum: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = accNum;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setCopiedAccount(true);
+      showToast("Đã copy số tài khoản!");
+      setTimeout(() => setCopiedAccount(false), 2000);
     } catch (err) {
       showToast("Lỗi copy!");
     }
@@ -832,22 +848,27 @@ const App = () => {
       {paymentOrder && (() => {
         const details = getPaymentDetails(paymentOrder);
         return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-              <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 sm:p-6 animate-in fade-in duration-200"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setPaymentOrder(null);
+            }}
+          >
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[calc(100dvh-2rem)] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
+              <div className="shrink-0 flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
                 <h3 className="font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                   <Wallet size={18} className="text-rose-600" />
                   Thanh toán VietQR
                 </h3>
-                <button onClick={() => setPaymentOrder(null)} className="text-slate-400 hover:text-rose-500 transition-colors p-1 rounded-lg hover:bg-rose-50">
+                <button onClick={() => setPaymentOrder(null)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 rounded-lg hover:bg-rose-50 bg-white shadow-sm border border-slate-200">
                   <X size={20} />
                 </button>
               </div>
               
-              <div className="p-6 flex flex-col md:flex-row gap-8 items-center md:items-start">
+              <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-6 sm:gap-8 items-center md:items-start overflow-y-auto">
                 {/* QR Code */}
-                <div className="shrink-0 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center gap-3">
-                  <img src={details.qrUrl} alt="VietQR" className="w-64 h-64 object-contain rounded-xl" />
+                <div className="shrink-0 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center gap-3 w-full max-w-[260px] mx-auto md:mx-0">
+                  <img src={details.qrUrl} alt="VietQR" className="w-full aspect-square object-contain rounded-xl" />
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
                     Quét mã bằng App Ngân Hàng
                   </div>
@@ -867,7 +888,17 @@ const App = () => {
                     </div>
                     <div className="flex flex-col border-b border-slate-100 pb-2">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Số tài khoản</span>
-                      <span className="font-mono font-black text-lg text-slate-800 tracking-tight">{details.accountNumber}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-black text-lg text-slate-800 tracking-tight">{details.accountNumber}</span>
+                        <button 
+                          onClick={() => copyAccountNumber(details.accountNumber)}
+                          className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 bg-slate-100 active:scale-95"
+                          title="Copy số tài khoản"
+                        >
+                          {copiedAccount ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                          <span className="text-xs font-bold hidden sm:inline">{copiedAccount ? 'Đã copy' : 'Copy'}</span>
+                        </button>
+                      </div>
                     </div>
                     <div className="flex flex-col border-b border-slate-100 pb-2">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Người nhận</span>
@@ -879,7 +910,7 @@ const App = () => {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nội dung chuyển khoản</span>
-                      <div className="font-mono text-sm font-bold text-slate-700 bg-slate-100 p-3 rounded-xl mt-1.5 break-all border border-slate-200">
+                      <div className="font-mono text-sm font-bold text-slate-700 bg-slate-100 p-3 rounded-xl mt-1.5 break-all border border-slate-200 relative group">
                         {details.cleanNote}
                       </div>
                     </div>
@@ -887,10 +918,10 @@ const App = () => {
                 </div>
               </div>
               
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
                 <button 
                   onClick={() => setPaymentOrder(null)}
-                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm rounded-xl transition-all shadow-sm active:scale-95"
+                  className="px-6 py-3 sm:py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm rounded-xl transition-all shadow-sm active:scale-95 w-full sm:w-auto"
                 >
                   Đóng
                 </button>
