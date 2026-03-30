@@ -135,8 +135,12 @@ const App = () => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup, ignore silently or show a specific message
+        return;
+      }
       showToast("Lỗi đăng nhập!");
     }
   };
