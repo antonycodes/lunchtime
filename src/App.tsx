@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2, RotateCcw } from 'lucide-react';
+import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -7,19 +7,19 @@ import { toPng } from 'html-to-image';
 
 const MENU_ITEMS = [
   { name: 'Ba rọi chiên', price: 30000, extraPrice: 20000, tier: 1 },
-  { name: 'Cá kho', price: 30000, extraPrice: 20000, tier: 1 },
-  { name: 'Trứng chiên thịt', price: 30000, extraPrice: 20000, tier: 1 },
-  { name: 'Ếch kho', price: 30000, extraPrice: 20000, tier: 1 },
-  { name: 'Sườn nướng', price: 30000, extraPrice: 20000, tier: 1 },
-  { name: 'Thịt kho tiêu', price: 30000, extraPrice: 20000, tier: 1 },
+  { name: 'Cá kho', price: 20000, extraPrice: 20000, tier: 1 },
+  { name: 'Trứng chiên thịt', price: 20000, extraPrice: 20000, tier: 1 },
+  { name: 'Ếch kho', price: 20000, extraPrice: 20000, tier: 1 },
+  { name: 'Sườn nướng', price: 20000, extraPrice: 20000, tier: 1 },
+  { name: 'Thịt kho tiêu', price: 20000, extraPrice: 20000, tier: 1 },
   { name: 'Canh chua không cá', price: 5000, extraPrice: 5000, tier: 1 },
-  { name: 'Đậu hũ nhồi thịt', price: 30000, extraPrice: 20000, tier: 1 },
-  { name: 'Thịt kho tôm', price: 30000, extraPrice: 20000, tier: 2 },
-  { name: 'Mắm chưng', price: 30000, extraPrice: 20000, tier: 2 },
-  { name: 'Gà đùi', price: 30000, extraPrice: 20000, tier: 2 },
-  { name: 'Lươn', price: 35000, extraPrice: 25000, tier: 2 },
-  { name: 'Thịt kho trứng', price: 30000, extraPrice: 20000, tier: 3 },
-  { name: 'Canh chua cá hú', price: 30000, extraPrice: 20000, tier: 3 },
+  { name: 'Đậu hũ nhồi thịt', price: 20000, extraPrice: 20000, tier: 1 },
+  { name: 'Thịt kho tôm', price: 20000, extraPrice: 20000, tier: 2 },
+  { name: 'Mắm chưng', price: 20000, extraPrice: 20000, tier: 2 },
+  { name: 'Gà đùi', price: 20000, extraPrice: 20000, tier: 2 },
+  { name: 'Lươn', price: 25000, extraPrice: 25000, tier: 2 },
+  { name: 'Thịt kho trứng', price: 20000, extraPrice: 20000, tier: 3 },
+  { name: 'Canh chua cá hú', price: 20000, extraPrice: 20000, tier: 3 },
   { name: 'Hộp cơm trắng không', price: 10000, extraPrice: 10000, tier: 0 },
   { name: 'Rau xào thêm', price: 5000, extraPrice: 5000, tier: 0 },
   { name: 'Cơm thêm', price: 0, extraPrice: 0, tier: 0 },
@@ -40,6 +40,7 @@ interface Order {
   extraDish: string;
   extraRice: boolean;
   paid: boolean;
+  note: string;
 }
 
 const getLocalDateString = () => {
@@ -63,13 +64,19 @@ const App = () => {
       mainDish: '',
       extraDish: '',
       extraRice: false,
-      paid: false
+      paid: false,
+      note: ''
     }))
   );
   
   const [date, setDate] = useState(getLocalDateString());
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [expandedMobileOrders, setExpandedMobileOrders] = useState<Record<number, boolean>>({});
+
+  const toggleMobileExpand = (id: number) => {
+    setExpandedMobileOrders(prev => ({ ...prev, [id]: !prev[id] }));
+  };
   const exportRef = useRef<HTMLDivElement>(null);
 
   const formattedDate = new Date(date).toLocaleDateString('vi-VN');
@@ -101,7 +108,8 @@ const App = () => {
           mainDish: data.mainDish || '',
           extraDish: data.extraDish || '',
           extraRice: data.extraRice || false,
-          paid: data.paid || false
+          paid: data.paid || false,
+          note: data.note || ''
         } as Order;
       });
       const fetchedMap = new Map(fetchedOrders.map(o => [o.id, o]));
@@ -121,7 +129,8 @@ const App = () => {
             mainDish: '',
             extraDish: '',
             extraRice: false,
-            paid: false
+            paid: false,
+            note: ''
           });
         }
       });
@@ -182,6 +191,7 @@ const App = () => {
       extraDish: orderToUpdate.extraDish || '',
       extraRice: orderToUpdate.extraRice || false,
       paid: orderToUpdate.paid || false,
+      note: orderToUpdate.note || '',
       [field]: value
     };
     
@@ -201,7 +211,7 @@ const App = () => {
     
     // Optimistic update
     if (id <= INITIAL_NAMES.length) {
-      const emptyOrder = { id, date, name: '', mainDish: '', extraDish: '', extraRice: false, paid: false };
+      const emptyOrder = { id, date, name: '', mainDish: '', extraDish: '', extraRice: false, paid: false, note: '' };
       setOrders(orders.map(o => o.id === id ? emptyOrder : o));
       try {
         await setDoc(doc(db, 'orders', `${date}_${id}`), emptyOrder);
@@ -231,7 +241,7 @@ const App = () => {
       showToast("Đang reset...");
       const promises = INITIAL_NAMES.map((name, index) => {
         const id = index + 1;
-        const emptyOrder = { id, date, name, mainDish: '', extraDish: '', extraRice: false, paid: false };
+        const emptyOrder = { id, date, name, mainDish: '', extraDish: '', extraRice: false, paid: false, note: '' };
         return setDoc(doc(db, 'orders', `${date}_${id}`), emptyOrder);
       });
       
@@ -257,7 +267,8 @@ const App = () => {
       mainDish: '',
       extraDish: '',
       extraRice: false,
-      paid: false
+      paid: false,
+      note: ''
     };
     
     // Optimistic update
@@ -295,6 +306,7 @@ const App = () => {
       let dish = o.mainDish || 'Không món chính';
       if (o.extraDish) dish += ` + ${o.extraDish}`;
       if (o.extraRice) dish += ` (Cơm thêm)`;
+      if (o.note) dish += ` [${o.note}]`;
       text += `${i + 1}. ${o.name || 'Hội viên'}: ${dish} - ${calculatePrice(o).toLocaleString()}đ\n`;
     });
     text += `--------------------------\n`;
@@ -482,83 +494,222 @@ const App = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Main Input Table */}
-          <div className="lg:col-span-8 overflow-hidden bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-200">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr className="text-[10px] uppercase tracking-widest font-black text-slate-400">
-                    <th className="px-4 py-3 w-10 text-center">#</th>
-                    <th className="px-4 py-3">Tên Nhân Viên</th>
-                    <th className="px-4 py-3">Món Chính</th>
-                    <th className="px-4 py-3">Món Thêm</th>
-                    <th className="px-4 py-3 text-center w-16">Cơm thêm</th>
-                    <th className="px-4 py-3 text-center w-16">Xoá</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {orders.map((order, index) => (
-                    <tr key={order.id} className="hover:bg-blue-50/20 group transition-colors">
-                      <td className="px-4 py-2 text-center text-slate-300 font-mono text-[11px]">{index + 1}</td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="text"
-                          disabled={!canEdit}
-                          className={`w-full bg-transparent border-none focus:ring-0 font-semibold text-sm ${!canEdit ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'}`}
-                          value={order.name}
-                          maxLength={100}
-                          placeholder="Nhập tên..."
-                          onChange={(e) => updateOrder(order.id, 'name', e.target.value)}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <select 
-                          disabled={!canEdit}
-                          className={`w-full bg-transparent border-none focus:ring-0 text-sm ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${order.mainDish ? 'text-blue-600 font-bold' : 'text-slate-400'}`}
-                          value={order.mainDish}
-                          onChange={(e) => updateOrder(order.id, 'mainDish', e.target.value)}
-                        >
-                          <option value="">-- Chọn --</option>
-                          {MENU_ITEMS.filter(m => m.tier > 0).map(m => (
-                            <option key={m.name} value={m.name}>{m.name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        <select 
-                          disabled={!canEdit}
-                          className={`w-full bg-transparent border-none focus:ring-0 text-xs text-slate-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
-                          value={order.extraDish}
-                          onChange={(e) => updateOrder(order.id, 'extraDish', e.target.value)}
-                        >
-                          <option value="">Không</option>
-                          {MENU_ITEMS.filter(m => m.name !== 'Cơm thêm').map(m => (
-                            <option key={m.name} value={m.name}>{m.name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <input 
-                          type="checkbox" 
-                          disabled={!canEdit}
-                          className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
-                          checked={order.extraRice}
-                          onChange={(e) => updateOrder(order.id, 'extraRice', e.target.checked)}
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <button 
-                          disabled={!canEdit}
-                          onClick={() => deleteOrder(order.id)}
-                          className={`p-1.5 rounded-lg transition-all ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} text-slate-400 hover:text-rose-500 hover:bg-rose-50`}
-                          title="Xoá"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
+          <div className="lg:col-span-8">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-hidden bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-200">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr className="text-[10px] uppercase tracking-widest font-black text-slate-400">
+                      <th className="px-4 py-3 w-10 text-center">#</th>
+                      <th className="px-4 py-3">Tên Nhân Viên</th>
+                      <th className="px-4 py-3">Món Chính</th>
+                      <th className="px-4 py-3">Thêm</th>
+                      <th className="px-4 py-3 text-center w-16">Cơm</th>
+                      <th className="px-4 py-3">Ghi chú</th>
+                      <th className="px-4 py-3 text-center w-16">Xoá</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {orders.map((order, index) => (
+                      <tr key={order.id} className="hover:bg-blue-50/20 group transition-colors">
+                        <td className="px-4 py-2 text-center text-slate-300 font-mono text-[11px]">{index + 1}</td>
+                        <td className="px-4 py-2">
+                          <input 
+                            type="text"
+                            disabled={!canEdit}
+                            className={`w-full bg-transparent border-none focus:ring-0 font-semibold text-sm ${!canEdit ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'}`}
+                            value={order.name}
+                            maxLength={100}
+                            placeholder="Nhập tên..."
+                            onChange={(e) => updateOrder(order.id, 'name', e.target.value)}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <select 
+                            disabled={!canEdit}
+                            className={`w-full bg-transparent border-none focus:ring-0 text-sm ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${order.mainDish ? 'text-blue-600 font-bold' : 'text-slate-400'}`}
+                            value={order.mainDish}
+                            onChange={(e) => updateOrder(order.id, 'mainDish', e.target.value)}
+                          >
+                            <option value="">-- Chọn --</option>
+                            {MENU_ITEMS.filter(m => m.tier > 0).map(m => (
+                              <option key={m.name} value={m.name}>{m.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-2">
+                          <select 
+                            disabled={!canEdit}
+                            className={`w-full bg-transparent border-none focus:ring-0 text-xs text-slate-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                            value={order.extraDish}
+                            onChange={(e) => updateOrder(order.id, 'extraDish', e.target.value)}
+                          >
+                            <option value="">Không</option>
+                            {MENU_ITEMS.filter(m => m.name !== 'Cơm thêm').map(m => (
+                              <option key={m.name} value={m.name}>{m.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <input 
+                            type="checkbox" 
+                            disabled={!canEdit}
+                            className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                            checked={order.extraRice}
+                            onChange={(e) => updateOrder(order.id, 'extraRice', e.target.checked)}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input 
+                            type="text"
+                            disabled={!canEdit}
+                            className={`w-full bg-transparent border-none focus:ring-0 text-xs ${!canEdit ? 'text-slate-400 cursor-not-allowed' : 'text-slate-600'}`}
+                            value={order.note || ''}
+                            maxLength={200}
+                            placeholder="Ghi chú..."
+                            onChange={(e) => updateOrder(order.id, 'note', e.target.value)}
+                          />
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <button 
+                            disabled={!canEdit}
+                            onClick={() => deleteOrder(order.id)}
+                            className={`p-1.5 rounded-lg transition-all ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} text-slate-400 hover:text-rose-500 hover:bg-rose-50`}
+                            title="Xoá"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {orders.map((order, index) => {
+                const isExpanded = expandedMobileOrders[order.id];
+                const hasOrdered = order.mainDish || order.extraDish;
+                
+                return (
+                  <div key={order.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-200">
+                    {/* Header - Always visible */}
+                    <div 
+                      className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50/50 border-b border-blue-100' : 'hover:bg-slate-50'}`}
+                      onClick={() => toggleMobileExpand(order.id)}
+                    >
+                      <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                        <span className={`font-mono text-[10px] px-2 py-1 rounded-md font-bold shrink-0 ${hasOrdered ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                          #{index + 1}
+                        </span>
+                        <div className="flex flex-col truncate">
+                          <span className={`font-bold text-sm truncate ${order.name ? 'text-slate-800' : 'text-slate-400 italic'}`}>
+                            {order.name || 'Chưa nhập tên...'}
+                          </span>
+                          {!isExpanded && hasOrdered && (
+                            <span className="text-[11px] text-slate-500 truncate mt-0.5">
+                              {order.mainDish || 'Không món chính'} {order.extraDish ? `+ ${order.extraDish}` : ''} {order.extraRice ? '(Cơm thêm)' : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 pl-2">
+                        {!isExpanded && hasOrdered && (
+                          <span className="text-xs font-bold text-blue-600">{calculatePrice(order).toLocaleString()}đ</span>
+                        )}
+                        {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+                      </div>
+                    </div>
+                    
+                    {/* Expanded Content */}
+                    {isExpanded && (
+                      <div className="p-4 space-y-3 bg-white">
+                        <div className="flex justify-between items-center gap-2">
+                          <input 
+                            type="text"
+                            disabled={!canEdit}
+                            className={`flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-sm focus:ring-1 focus:ring-blue-500 ${!canEdit ? 'text-slate-400 cursor-not-allowed' : 'text-slate-800'}`}
+                            value={order.name}
+                            maxLength={100}
+                            placeholder="Tên nhân viên..."
+                            onChange={(e) => updateOrder(order.id, 'name', e.target.value)}
+                          />
+                          <button 
+                            disabled={!canEdit}
+                            onClick={(e) => { e.stopPropagation(); deleteOrder(order.id); }}
+                            className={`p-2 rounded-lg transition-all ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} text-slate-400 hover:text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-100`}
+                            title="Xoá"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 gap-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 w-16 shrink-0">Món chính</span>
+                            <select 
+                              disabled={!canEdit}
+                              className={`flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${order.mainDish ? 'text-blue-700 font-bold' : 'text-slate-500'}`}
+                              value={order.mainDish}
+                              onChange={(e) => updateOrder(order.id, 'mainDish', e.target.value)}
+                            >
+                              <option value="">-- Chọn món --</option>
+                              {MENU_ITEMS.filter(m => m.tier > 0).map(m => (
+                                <option key={m.name} value={m.name}>{m.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 w-16 shrink-0">Món thêm</span>
+                            <select 
+                              disabled={!canEdit}
+                              className={`flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} text-slate-600`}
+                              value={order.extraDish}
+                              onChange={(e) => updateOrder(order.id, 'extraDish', e.target.value)}
+                            >
+                              <option value="">Không</option>
+                              {MENU_ITEMS.filter(m => m.name !== 'Cơm thêm').map(m => (
+                                <option key={m.name} value={m.name}>{m.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 w-16 shrink-0">Ghi chú</span>
+                            <input 
+                              type="text"
+                              disabled={!canEdit}
+                              className={`flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'text-slate-600'}`}
+                              value={order.note || ''}
+                              maxLength={200}
+                              placeholder="Ghi chú thêm..."
+                              onChange={(e) => updateOrder(order.id, 'note', e.target.value)}
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="w-16 shrink-0"></span>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                disabled={!canEdit}
+                                className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 ${!canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                                checked={order.extraRice}
+                                onChange={(e) => updateOrder(order.id, 'extraRice', e.target.checked)}
+                              />
+                              <span className="text-sm font-bold text-slate-600">Cơm thêm</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -587,42 +738,45 @@ const App = () => {
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ảnh xem trước</span>
               </div>
               
-              <div ref={exportRef} className="bg-white p-6 min-w-[380px]">
-                <div className="text-center mb-6">
-                  <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">ORDER ĐẶT CƠM</h2>
-                  <p className="text-blue-600 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">Ngày {formattedDate}</p>
-                </div>
-                
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100">
-                      <th className="border border-slate-200 px-3 py-2 text-left text-[10px] font-black uppercase text-slate-600">Họ Tên</th>
-                      <th className="border border-slate-200 px-3 py-2 text-left text-[10px] font-black uppercase text-slate-600">Món Đặt</th>
-                      <th className="border border-slate-200 px-3 py-2 text-right text-[10px] font-black uppercase text-slate-600">Tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeOrders.map(o => (
-                      <tr key={o.id}>
-                        <td className="border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800">{o.name || '---'}</td>
-                        <td className="border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 leading-tight">
-                          {o.mainDish || <span className="text-slate-400 italic">Không món chính</span>}
-                          {o.extraDish ? <span className="text-blue-500"> + {o.extraDish}</span> : ''}
-                          {o.extraRice ? <span className="text-emerald-600 font-bold italic"> (Cơm thêm)</span> : ''}
-                        </td>
-                        <td className="border border-slate-200 px-3 py-1.5 text-[12px] font-mono font-bold text-right text-slate-700">
-                          {calculatePrice(o).toLocaleString()}
+              <div className="overflow-x-auto">
+                <div ref={exportRef} className="bg-white p-6 min-w-[380px]">
+                  <div className="text-center mb-6">
+                    <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">CHI TIẾT ĐẶT CƠM</h2>
+                    <p className="text-blue-600 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">Ngày {formattedDate}</p>
+                  </div>
+                  
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100">
+                        <th className="border border-slate-200 px-3 py-2 text-left text-[10px] font-black uppercase text-slate-600">Họ Tên</th>
+                        <th className="border border-slate-200 px-3 py-2 text-left text-[10px] font-black uppercase text-slate-600">Món Đặt</th>
+                        <th className="border border-slate-200 px-3 py-2 text-right text-[10px] font-black uppercase text-slate-600">Tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeOrders.map(o => (
+                        <tr key={o.id}>
+                          <td className="border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800">{o.name || '---'}</td>
+                          <td className="border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 leading-tight">
+                            {o.mainDish || <span className="text-slate-400 italic">Không món chính</span>}
+                            {o.extraDish ? <span className="text-blue-500"> + {o.extraDish}</span> : ''}
+                            {o.extraRice ? <span className="text-emerald-600 font-bold italic"> (Cơm thêm)</span> : ''}
+                            {o.note ? <div className="text-[10px] text-amber-600 italic mt-0.5">Ghi chú: {o.note}</div> : ''}
+                          </td>
+                          <td className="border border-slate-200 px-3 py-1.5 text-[12px] font-mono font-bold text-right text-slate-700">
+                            {calculatePrice(o).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-slate-900 text-white">
+                        <td colSpan="2" className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-widest">Tổng Cộng:</td>
+                        <td className="px-3 py-2.5 text-right text-base font-black font-mono tracking-tighter">
+                          {totalAmount.toLocaleString()}đ
                         </td>
                       </tr>
-                    ))}
-                    <tr className="bg-slate-900 text-white">
-                      <td colSpan="2" className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-widest">Tổng Cộng:</td>
-                      <td className="px-3 py-2.5 text-right text-base font-black font-mono tracking-tighter">
-                        {totalAmount.toLocaleString()}đ
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
