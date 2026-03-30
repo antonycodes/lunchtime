@@ -7,6 +7,7 @@ import { toPng } from 'html-to-image';
 
 const MENU_ITEMS = [
   { name: 'Ba rọi chiên', price: 30000, tier: 1 },
+  { name: 'Ba rọi chiên thêm', price: 20000, tier: 0 },
   { name: 'Cá kho', price: 20000, tier: 1 },
   { name: 'Trứng chiên thịt', price: 20000, tier: 1 },
   { name: 'Ếch kho', price: 20000, tier: 1 },
@@ -259,7 +260,7 @@ const App = () => {
     return total;
   };
 
-  const activeOrders = orders.filter(o => o.mainDish !== '');
+  const activeOrders = orders.filter(o => o.mainDish !== '' || o.extraDish !== '');
   const totalAmount = orders.reduce((sum, o) => sum + calculatePrice(o), 0);
 
   const copyToClipboard = () => {
@@ -271,7 +272,7 @@ const App = () => {
     let text = `📋 TỔNG ORDER CƠM - NGÀY ${formattedDate}\n`;
     text += `--------------------------\n`;
     activeOrders.forEach((o, i) => {
-      let dish = o.mainDish;
+      let dish = o.mainDish || 'Không món chính';
       if (o.extraDish) dish += ` + ${o.extraDish}`;
       if (o.extraRice) dish += ` (Cơm thêm)`;
       text += `${i + 1}. ${o.name || 'Hội viên'}: ${dish} - ${calculatePrice(o).toLocaleString()}đ\n`;
@@ -582,7 +583,7 @@ const App = () => {
                       <tr key={o.id}>
                         <td className="border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800">{o.name || '---'}</td>
                         <td className="border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 leading-tight">
-                          {o.mainDish}
+                          {o.mainDish || <span className="text-slate-400 italic">Không món chính</span>}
                           {o.extraDish ? <span className="text-blue-500"> + {o.extraDish}</span> : ''}
                           {o.extraRice ? <span className="text-emerald-600 font-bold italic"> (Cơm thêm)</span> : ''}
                         </td>
