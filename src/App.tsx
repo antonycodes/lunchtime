@@ -537,7 +537,7 @@ const App = () => {
                     <tr className="bg-slate-100">
                       <th className="border border-slate-200 px-3 py-2 text-left text-[10px] font-black uppercase text-slate-600">Họ Tên</th>
                       <th className="border border-slate-200 px-3 py-2 text-left text-[10px] font-black uppercase text-slate-600">Món Đặt</th>
-                      <th className="border border-slate-200 px-3 py-2 text-right text-[10px] font-black uppercase text-slate-600">Tiền</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right text-[10px] font-black uppercase text-slate-600">Thành tiềnn</th>
                     </tr>
                   </thead>
                   <tbody>
