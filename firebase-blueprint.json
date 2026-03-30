@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "A lunch order for a specific person on a specific date.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "date": { "type": "string" },
+        "name": { "type": "string" },
+        "mainDish": { "type": "string" },
+        "extraDish": { "type": "string" },
+        "extraRice": { "type": "boolean" },
+        "paid": { "type": "boolean" }
+      },
+      "required": ["id", "date", "name", "mainDish", "extraDish", "extraRice", "paid"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": {
+        "$ref": "#/entities/Order"
+      },
+      "description": "Stores individual lunch orders."
+    }
+  }
+}

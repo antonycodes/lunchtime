@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: orders
+    // Document ID: {date}_{id}
+    // Fields:
+    //   - id: number (required) - The ID of the order
+    //   - date: string (required) - The date of the order (YYYY-MM-DD)
+    //   - name: string (required) - The name of the person ordering
+    //   - mainDish: string (required) - The main dish selected
+    //   - extraDish: string (required) - The extra dish selected
+    //   - extraRice: boolean (required) - Whether extra rice is ordered
+    //   - paid: boolean (required) - Whether the order has been paid
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidOrder(data) {
+      return hasOnlyAllowedFields(['id', 'date', 'name', 'mainDish', 'extraDish', 'extraRice', 'paid']) &&
+             hasRequiredFields(['id', 'date', 'name', 'mainDish', 'extraDish', 'extraRice', 'paid']) &&
+             data.id is number &&
+             data.date is string && data.date.size() == 10 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.mainDish is string && data.mainDish.size() <= 100 &&
+             data.extraDish is string && data.extraDish.size() <= 100 &&
+             data.extraRice is bool &&
+             data.paid is bool;
+    }
+
+    match /orders/{orderId} {
+      // Allow any authenticated user to read, create, and update orders.
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow update: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+  }
+}
