@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2, RotateCcw, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -331,6 +331,26 @@ const App = () => {
   const isPastDeadline = checkIsPastDeadline();
   const canEdit = !!user;
 
+  const handlePayment = (order: Order) => {
+    const amount = calculatePrice(order);
+    if (amount === 0) {
+      showToast("Đơn hàng chưa có số tiền hợp lệ!");
+      return;
+    }
+    
+    const removeAccents = (str: string) => {
+      return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+    };
+    
+    const note = `thanh toan tien com be Hai ngay ${formattedDate}`;
+    const cleanNote = removeAccents(note);
+    
+    const deepLink = `momo://pay?phone=0937493558&amount=${amount}&note=${encodeURIComponent(cleanNote)}`;
+    
+    window.location.href = deepLink;
+    showToast("Đang chuyển sang MoMo...");
+  };
+
   const exportAsImage = async () => {
     if (activeOrders.length === 0) {
       showToast("Chưa có món để xuất ảnh!");
@@ -494,6 +514,7 @@ const App = () => {
                       <th className="px-4 py-3">Thêm</th>
                       <th className="px-4 py-3 text-center w-16">Cơm</th>
                       <th className="px-4 py-3">Ghi chú</th>
+                      <th className="px-4 py-3 text-center w-24">Thanh toán</th>
                       <th className="px-4 py-3 text-center w-16">Xoá</th>
                     </tr>
                   </thead>
@@ -559,6 +580,17 @@ const App = () => {
                           />
                         </td>
                         <td className="px-4 py-2 text-center">
+                          {calculatePrice(order) > 0 && (
+                            <button 
+                              onClick={() => handlePayment(order)}
+                              className="flex items-center justify-center gap-1 bg-[#A50064] hover:bg-[#8a0053] text-white px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-sm w-full"
+                              title="Thanh toán qua MoMo"
+                            >
+                              <Wallet size={12} /> MoMo
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-center">
                           <button 
                             disabled={!canEdit}
                             onClick={() => deleteOrder(order.id)}
@@ -604,8 +636,17 @@ const App = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 pl-2">
-                        {!isExpanded && hasOrdered && (
-                          <span className="text-xs font-bold text-blue-600">{calculatePrice(order).toLocaleString()}đ</span>
+                        {hasOrdered && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-blue-600">{calculatePrice(order).toLocaleString()}đ</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handlePayment(order); }}
+                              className="bg-[#A50064] hover:bg-[#8a0053] text-white p-1.5 rounded-lg transition-all shadow-sm flex items-center justify-center"
+                              title="Thanh toán MoMo"
+                            >
+                              <Wallet size={14} />
+                            </button>
+                          </div>
                         )}
                         {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
                       </div>
