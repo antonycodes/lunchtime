@@ -589,7 +589,7 @@ const App = () => {
               
               <div ref={exportRef} className="bg-white p-6 min-w-[380px]">
                 <div className="text-center mb-6">
-                  <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">CHI TIẾT ĐẶT CƠM</h2>
+                  <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">ORDER ĐẶT CƠM</h2>
                   <p className="text-blue-600 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">Ngày {formattedDate}</p>
                 </div>
                 
