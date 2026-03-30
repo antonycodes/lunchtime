@@ -490,8 +490,8 @@ const App = () => {
                     <th className="px-4 py-3 w-10 text-center">#</th>
                     <th className="px-4 py-3">Tên Nhân Viên</th>
                     <th className="px-4 py-3">Món Chính</th>
-                    <th className="px-4 py-3">Thêm</th>
-                    <th className="px-4 py-3 text-center w-16">Cơm</th>
+                    <th className="px-4 py-3">Món Thêm</th>
+                    <th className="px-4 py-3 text-center w-16">Cơm thêm</th>
                     <th className="px-4 py-3 text-center w-16">Xoá</th>
                   </tr>
                 </thead>
