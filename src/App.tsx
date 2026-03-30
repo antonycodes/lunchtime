@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, CheckCircle, Camera, ListChecks, Copy, Check, Calendar, LogIn, LogOut, Clock, AlertCircle, Trash2, RotateCcw } from 'lucide-react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -7,19 +7,19 @@ import { toPng } from 'html-to-image';
 
 const MENU_ITEMS = [
   { name: 'Ba rọi chiên', price: 30000, tier: 1 },
-  { name: 'Cá kho', price: 30000, tier: 1 },
-  { name: 'Trứng chiên thịt', price: 30000, tier: 1 },
-  { name: 'Ếch kho', price: 30000, tier: 1 },
-  { name: 'Sườn nướng', price: 30000, tier: 1 },
-  { name: 'Thịt kho tiêu', price: 30000, tier: 1 },
+  { name: 'Cá kho', price: 20000, tier: 1 },
+  { name: 'Trứng chiên thịt', price: 20000, tier: 1 },
+  { name: 'Ếch kho', price: 20000, tier: 1 },
+  { name: 'Sườn nướng', price: 20000, tier: 1 },
+  { name: 'Thịt kho tiêu', price: 20000, tier: 1 },
   { name: 'Canh chua không cá', price: 5000, tier: 1 },
-  { name: 'Đậu hũ nhồi thịt', price: 30000, tier: 1 },
-  { name: 'Thịt kho tôm', price: 30000, tier: 2 },
-  { name: 'Mắm chưng', price: 30000, tier: 2 },
-  { name: 'Gà đùi', price: 30000, tier: 2 },
-  { name: 'Lươn', price: 35000, tier: 2 },
-  { name: 'Thịt kho trứng', price: 30000, tier: 3 },
-  { name: 'Canh chua cá hú', price: 30000, tier: 3 },
+  { name: 'Đậu hũ nhồi thịt', price: 20000, tier: 1 },
+  { name: 'Thịt kho tôm', price: 20000, tier: 2 },
+  { name: 'Mắm chưng', price: 20000, tier: 2 },
+  { name: 'Gà đùi', price: 20000, tier: 2 },
+  { name: 'Lươn', price: 25000, tier: 2 },
+  { name: 'Thịt kho trứng', price: 20000, tier: 3 },
+  { name: 'Canh chua cá hú', price: 20000, tier: 3 },
   { name: 'Hộp cơm trắng không', price: 10000, tier: 0 },
   { name: 'Rau xào thêm', price: 5000, tier: 0 },
   { name: 'Cơm thêm', price: 0, tier: 0 },
@@ -199,6 +199,34 @@ const App = () => {
     }
   };
 
+  const resetInitialNames = async () => {
+    if (!user) {
+      showToast("Vui lòng đăng nhập để thực hiện!");
+      return;
+    }
+    if (!window.confirm("Bạn có chắc muốn reset danh sách về mặc định cho ngày hôm nay? Toàn bộ món đã đặt sẽ bị xoá!")) return;
+    
+    try {
+      showToast("Đang reset...");
+      const promises = INITIAL_NAMES.map((name, index) => {
+        const id = index + 1;
+        const emptyOrder = { id, date, name, mainDish: '', extraDish: '', extraRice: false, paid: false };
+        return setDoc(doc(db, 'orders', `${date}_${id}`), emptyOrder);
+      });
+      
+      const extraOrders = orders.filter(o => o.id > INITIAL_NAMES.length);
+      extraOrders.forEach(o => {
+        promises.push(deleteDoc(doc(db, 'orders', `${date}_${o.id}`)));
+      });
+
+      await Promise.all(promises);
+      showToast("Đã reset danh sách!");
+    } catch (error) {
+      console.error("Error resetting:", error);
+      showToast("Lỗi reset dữ liệu!");
+    }
+  };
+
   const addNewRow = async () => {
     const newId = Date.now();
     const newOrder: Order = {
@@ -369,6 +397,15 @@ const App = () => {
           
           <div className="flex flex-wrap justify-center items-center gap-1.5">
             <button 
+              onClick={resetInitialNames}
+              disabled={!canEdit}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all active:scale-95 font-bold text-xs border ${!canEdit ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 shadow-sm'}`}
+              title="Reset danh sách về mặc định"
+            >
+              <RotateCcw size={14} />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+            <button 
               onClick={copyToClipboard}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all active:scale-95 font-bold text-xs border ${copied ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-sm'}`}
             >
@@ -537,7 +574,7 @@ const App = () => {
                     <tr className="bg-slate-100">
                       <th className="border border-slate-200 px-3 py-2 text-left text-[10px] font-black uppercase text-slate-600">Họ Tên</th>
                       <th className="border border-slate-200 px-3 py-2 text-left text-[10px] font-black uppercase text-slate-600">Món Đặt</th>
-                      <th className="border border-slate-200 px-3 py-2 text-right text-[10px] font-black uppercase text-slate-600">Thành tiền</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right text-[10px] font-black uppercase text-slate-600">Tiền</th>
                     </tr>
                   </thead>
                   <tbody>
